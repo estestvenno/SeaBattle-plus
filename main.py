@@ -1732,7 +1732,7 @@ async def on_startup(db):
     print("Bot started")
 
     global con, init_field, init_algorithm
-    con = sqlite3.connect('.\db\sea_battle.db')
+    con = sqlite3.connect('.\data\db\sea_battle.db')
 
     if con:
         print("Database successfully connected")
