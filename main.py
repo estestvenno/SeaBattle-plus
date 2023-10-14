@@ -1,5 +1,5 @@
 import asyncio
-import requests
+import logging
 import random
 import sqlite3
 from copy import deepcopy
@@ -14,8 +14,8 @@ from aiogram.utils.exceptions import MessageNotModified, MessageCantBeEdited
 from config import TOKEN
 from func import check_and_add_user_from_db, need_a_hint, post_user_language, update_hint, about_the_user, \
     result_of_battle, changing_balance, check_user_from_db, sorting_by_criterion
-from language.language_definition import getting_the_language_message, getting_the_language_call
-from language.language import LANGUAGE
+from language_definition import getting_the_language_message, getting_the_language_call
+from language import LANGUAGE
 
 from creating_playing_field import CreatingField
 
@@ -29,6 +29,13 @@ PLAYERS_IN_GAME = {}
 ACTIVE_GAMES = []
 PROCESS_CREATING_FIELD = {}
 
+# Настройка параметров логгирования
+log_file = 'game_log.log'
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+# Создание логгера для этого модуля
+logger = logging.getLogger(__name__)
+
 
 # Класс описывающий игрока
 class Player:
@@ -38,11 +45,11 @@ class Player:
     SHIP_SIZES = {6: [4, 3, 2, 1], 8: [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]}
     BIG_GUNS = {1: 50, 2: 125, 3: 125, 4: 275}
 
-    def __init__(self, bot, dp: Dispatcher, con, player_call, state, board, user_id, hints):
+    def __init__(self, bot_p, dp_p: Dispatcher, con_p, player_call, state, board, user_id, hints):
         # Возможно уберу
-        self.bot = bot
-        self.dp = dp
-        self.con = con
+        self.bot = bot_p
+        self.dp = dp_p
+        self.con = con_p
         # Последнее сообщение человека
         self.player_call = player_call
         # Последнее состояние человека
@@ -72,29 +79,24 @@ class Player:
         self.dp.register_callback_query_handler(self.super_weapon, Text(startswith=f'super_weapon{self.user_id}'))
 
     async def make_move(self, call: types.CallbackQuery, state: FSMContext):
-        # Выполнение хода
-        print(self, 'Второй игрок')
-        if self.is_turn:
-            print(self, 'Первый игрок')
-            # Последнее сообщение человека
-            self.player_call = call
-            # Последнее состояние человека
-            self.player_state = state
-            x_y = call.data.split("_")
-            x, y = int(x_y[2]), int(x_y[3])
-            if len(x_y) == 5:
-                print("супер")
-                damage = await self.damage_handler(x, y, int(x_y[4]))
-                await self.game.start_game(x, y, super_weapon=damage, super_weapon_type=int(x_y[4]))
-                await call.answer()
-            else:
-                print("не супер")
-                await self.game.start_game(x, y)
-                await call.answer()
-        else:
+        if not self.is_turn:
             lang_code = await getting_the_language_call(call, state, self.con)
             text = LANGUAGE[lang_code]['super_weapon']
             await call.answer(text[1], True)
+            return
+
+        self.player_call = call
+        self.player_state = state
+        x_y = call.data.split("_")
+        x, y = int(x_y[2]), int(x_y[3])
+
+        if len(x_y) == 5:
+            damage = await self.damage_handler(x, y, int(x_y[4]))
+            await self.game.start_game(x, y, super_weapon=damage, super_weapon_type=int(x_y[4]))
+        else:
+            await self.game.start_game(x, y)
+
+        await call.answer()
 
     # Возвращает клетки подбитые супероружием
     async def damage_handler(self, x, y, type_of_weapon):
@@ -1108,7 +1110,7 @@ class GameAlgorithm(Game):
 async def menu_by_command(message: types.Message, state: FSMContext):
     is_new_user = await check_user_from_db(message.from_user.id, con)
     # проверка на наличие юзера в бд и добавление его туда
-    await check_and_add_user_from_db(message.from_user.id, "en", con)
+    await check_and_add_user_from_db(message.from_user.id, "ru", con)
     # получение языка пользователя
     lang_code = await getting_the_language_message(message, state, con)
     # Доп функции по ссылке
@@ -1131,7 +1133,7 @@ async def menu_by_command(message: types.Message, state: FSMContext):
             else:
                 await state.update_data(friend=friend_id)
 
-    text_menu = LANGUAGE[lang_code]['menu'][0].format(name=message.from_user.first_name)
+    text_menu = LANGUAGE[lang_code]['menu'][0]
     text = LANGUAGE[lang_code]['menu']
     # добавление кнопок навигации в меню
     markup = types.InlineKeyboardMarkup()
@@ -1150,7 +1152,7 @@ async def menu_by_command(message: types.Message, state: FSMContext):
     # Игра со случайным пользователем
     markup.row(types.InlineKeyboardButton(text=text[6], callback_data=f"fight_with_man_call"))
     # ответ пользователю
-    await bot.send_message(message.from_user.id, text=text_menu, reply_markup=markup)
+    await bot.send_message(message.from_user.id, text=text_menu, reply_markup=markup, parse_mode='HTML')
 
 
 # Стартовое меню по кнопке
@@ -1158,7 +1160,7 @@ async def menu_by_command(message: types.Message, state: FSMContext):
 async def menu_by_button(call: types.CallbackQuery, state: FSMContext):
     # получение языка пользователя
     lang_code = await getting_the_language_call(call, state, con)
-    text_menu = LANGUAGE[lang_code]['menu'][0].format(name=call.from_user.first_name)
+    text_menu = LANGUAGE[lang_code]['menu'][0]
     text = LANGUAGE[lang_code]['menu']
     # добавление кнопок навигации в меню
     markup = types.InlineKeyboardMarkup()
@@ -1177,7 +1179,7 @@ async def menu_by_button(call: types.CallbackQuery, state: FSMContext):
     # Игра со случайным пользователем
     markup.row(types.InlineKeyboardButton(text=text[6], callback_data=f"fight_with_man_call"))
     # ответ пользователю
-    await call.message.edit_text(text=text_menu, reply_markup=markup)
+    await call.message.edit_text(text=text_menu, reply_markup=markup, parse_mode='HTML')
 
 
 # Переходник для удаления игрока нажавшего возврат в меню
@@ -1719,6 +1721,7 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
 
     await call.message.edit_text(text=text_osn, reply_markup=markup, parse_mode='HTML')
 
+
 async def get_user_data(user_ids):
     user_data = {}
     for user_id in user_ids:
@@ -1732,7 +1735,7 @@ async def on_startup(db):
     print("Bot started")
 
     global con, init_field, init_algorithm
-    con = sqlite3.connect('.\data\db\sea_battle.db')
+    con = sqlite3.connect('.\data\sea_battle.db')
 
     if con:
         print("Database successfully connected")

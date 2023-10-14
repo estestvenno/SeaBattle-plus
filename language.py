@@ -2,7 +2,9 @@ LANGUAGE = {
     "ru": {
         "menu": [
             "🏠 Меню"
-            "\n⚓️ Готов начать бой, {name}? ⚓️",
+            "\n⚓️ Готов начать бой? ⚓️"
+            "\nПо всем вопросам и возникшим багам"
+            "\n<a href='tg://user?id={898565893}'>Разработчик</a>",
             "📚 Правила игры",
             "⚙️ Настройки",
             "👤 Профиль",
@@ -234,16 +236,19 @@ LANGUAGE = {
     },
 
     "en": {
-        "menu": ["🏠 Menu"
-                 "\n⚓️ Ready to start the battle, {name}? ⚓️",
-                 "📚 Game Rules",
-                 "⚙️ Settings",
-                 "👤 Profile",
-                 "🤖 Play against the bot",
-                 "🤝 Play against a friend",
-                 "🎮 Play",
-                 "You have been credited with 1000🪙.",
-                 "🏆Top Players"],
+        "menu": [
+            "🏠 Menu"
+            "\n⚓️ Ready to start a battle? ⚓️"
+            "\nFor any questions and any bugs that arise "
+            "\n<a href='tg://user?id={898565893}'>Developer</a>",
+            "📚 Game Rules",
+            "⚙️ Settings",
+            "👤 Profile",
+            "🤖 Play against the bot",
+            "🤝 Play against a friend",
+            "🎮 Play",
+            "You have been credited with 1000🪙.",
+            "🏆Top Players"],
         "rules_menu": [
             "🏠 Menu // 📚 Rules"
             "\n⬇️ Rules of this game ⬇️",

@@ -5,8 +5,8 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram import types
 
-from language.language import LANGUAGE
-from language.language_definition import getting_the_language_call
+from language import LANGUAGE
+from language_definition import getting_the_language_call
 
 
 class CreatingField:
@@ -214,7 +214,8 @@ class CreatingField:
         Генерирует поле заданного размера со случайно размещенными кораблями заданных размеров.
         """
         field = [[0 for _ in range(size + 1)] for _ in range(size + 1)]
-        for ship_size in self.SHIP_SIZES[f"{size}x{size}"]:
+        ship_sizes = deepcopy(self.SHIP_SIZES)
+        for ship_size in ship_sizes[f"{size}x{size}"]:
             await self.place_ship(ship_size, field, size)
         return field
 

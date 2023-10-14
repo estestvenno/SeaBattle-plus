@@ -12,7 +12,7 @@ async def getting_the_language_message(message: types.Message, state: FSMContext
         # Если значение языка не сохранено в словаре, получаем его из базы данных
         lang_code = await get_user_language(message.from_user.id, con)
         if not lang_code:
-            lang_code = 'en'
+            lang_code = 'ru'
             await post_user_language(message.from_user.id, lang_code, con)
         await state.update_data(lang=lang_code)
     return lang_code
