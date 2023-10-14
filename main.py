@@ -238,7 +238,8 @@ class Player:
             except MessageNotModified:
                 pass
         else:
-            await self.game.logic_of_victory_and_defeat(self)
+            if self.game in ACTIVE_GAMES:
+                await self.game.logic_of_victory_and_defeat(self)
 
     # Меню выбора супероружия
     async def super_weapon_menu(self, call: types.CallbackQuery, state: FSMContext):
@@ -374,7 +375,9 @@ class Player:
         if algorithm:
             balance = difficulty * 5
             await result_of_battle(call.from_user.id, True, self.con, algorithm, balance)
-        await result_of_battle(call.from_user.id, True, self.con, algorithm)
+        else:
+            balance = 30
+            await result_of_battle(call.from_user.id, True, self.con, algorithm, balance)
         # Отправление ему соболезнований
         await call.message.edit_text(text=text[0], reply_markup=markup, parse_mode='HTML')
 

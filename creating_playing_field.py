@@ -10,16 +10,15 @@ from language_definition import getting_the_language_call
 
 
 class CreatingField:
-    CELL_TYPE = ["🟦", "⛵", "🚤", "⛴", "🚢"]
-    SHIP_SIZES = {"6x6": [4, 3, 2, 1], "8x8": [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]}
-    NUMBER_SHIP_CELLS = {"6x6": {4: 4, 3: 3, 2: 2, 1: 1}, "8x8": {4: 4, 3: 6, 2: 6, 1: 4}}
-
     def __init__(self, dp, con, type_of_battle):
         self.dp = dp
         self.con = con
         self.field = []
         self.size = 8
         self.type_of_battle = type_of_battle
+        self.CELL_TYPE = ["🟦", "⛵", "🚤", "⛴", "🚢"]
+        self.SHIP_SIZES = {"6x6": [4, 3, 2, 1], "8x8": [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]}
+        self.NUMBER_SHIP_CELLS = {"6x6": {4: 4, 3: 3, 2: 2, 1: 1}, "8x8": {4: 4, 3: 6, 2: 6, 1: 4}}
         self.dp.register_callback_query_handler(self.reaction_clicking_field, Text(startswith='field_call'))
         self.dp.register_callback_query_handler(self.auto_working_with_field, Text(startswith='auto_field_call'))
         self.dp.register_callback_query_handler(self.cleaning, Text(startswith='cleaning'))
