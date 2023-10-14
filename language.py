@@ -232,7 +232,10 @@ LANGUAGE = {
                 "в боях с людьми⚡️",
                 "в боях с алгоритмом🤖",
                 "\nПобеды🏆|Поражения😓|Рейтинг📊\n",
-                ]
+                ],
+        "message_error": ["Извините, но бот не понимает текстовых сообщений."
+                          " Пожалуйста, используйте кнопки,"
+                          " или если у вас есть вопросы, не стесняйтесь писать здесь."]
     },
 
     "en": {
@@ -472,7 +475,9 @@ LANGUAGE = {
                 "in battles against humans⚡️",
                 "in battles against the algorithm🤖",
                 "\nWins🏆|Losses😓|Rating📊\n",
-                ]
+                ],
+        "message_error": ["Sorry, but the bot doesn't understand text messages."
+                          " Please use the buttons, or if you have questions, feel free to type here."]
 
     }
 

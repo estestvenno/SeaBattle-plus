@@ -11,7 +11,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.utils.exceptions import MessageNotModified, MessageCantBeEdited
 
-from config import TOKEN
+from config import TOKEN, YOUR_USER_ID
 from func import check_and_add_user_from_db, need_a_hint, post_user_language, update_hint, about_the_user, \
     result_of_battle, changing_balance, check_user_from_db, sorting_by_criterion
 from language_definition import getting_the_language_message, getting_the_language_call
@@ -102,31 +102,35 @@ class Player:
     async def damage_handler(self, x, y, type_of_weapon):
         damage = []
         print(type_of_weapon, "тип оружия")
+
         if type_of_weapon == 1:
             ...
         elif type_of_weapon == 2:
             for i in range(-1, 2):
                 for j in range(-1, 2):
-                    if 0 <= (x + i) < self.size and 0 <= (y + j) < self.size:
-                        damage.append([x + i, y + j])
+                    new_x, new_y = x + i, y + j
+                    if 0 <= new_x < self.size and 0 <= new_y < self.size:
+                        damage.append([new_x, new_y])
         elif type_of_weapon == 3:
             for i in range(-7, 8):
-                if 0 <= (y + i) < self.size:
-                    damage.append([x, y + i])
-                if y + i > self.size:
+                new_y = y + i
+                if 0 <= new_y < self.size:
+                    damage.append([x, new_y])
+                if new_y > self.size:
                     break
         elif type_of_weapon == 4:
             for i in range(-2, 3):
                 for j in range(-2, 3):
-                    if 0 <= (x + i) < self.size and 0 <= (y + j) < self.size:
-                        damage.append([x + i, y + j])
+                    new_x, new_y = x + i, y + j
+                    if 0 <= new_x < self.size and 0 <= new_y < self.size:
+                        damage.append([new_x, new_y])
+
         return damage
 
     # Переключение очереди хода
     async def queue(self):
         # Переключение очереди хода
         self.is_turn = (self.is_turn + 1) % 2
-        print("очередь:", self.is_turn)
 
     # Подключение к игре
     async def connecting_to_game(self, game):
@@ -1668,33 +1672,35 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
     text_osn = deepcopy(text[0])
     criteria = call.data.split("_")[1]
 
-    # Функция для создания кнопок статистики
-    def create_stat_buttons():
-        buttons = [
-            types.InlineKeyboardButton(text=text[i], callback_data=f"top_{text[i].lower()}")
-            for i in range(4, 8)
-        ]
-        return buttons
-
     # Создание кнопок с возможностями статистики
     markup = types.InlineKeyboardMarkup()
-    markup.row(
-        types.InlineKeyboardButton(text=text[4], callback_data=f"top_balance"),
-        types.InlineKeyboardButton(text=text[5], callback_data=f"top_human"),
-        types.InlineKeyboardButton(text=text[6], callback_data=f"top_alg"),
-    )
-    markup.row(
-        types.InlineKeyboardButton(text=text[7], callback_data=f"start_call"),
-    )
 
     if criteria == "balance":
         text_osn = text_osn.format(criterion=text[8])
+        markup.row(
+            types.InlineKeyboardButton(text="✅" + text[4], callback_data=f"top_balance"),
+            types.InlineKeyboardButton(text=text[5], callback_data=f"top_human"),
+            types.InlineKeyboardButton(text=text[6], callback_data=f"top_alg"),
+        )
     elif criteria == "human":
         text_osn = text_osn.format(criterion=text[9])
         text_osn += text[11]
+        markup.row(
+            types.InlineKeyboardButton(text=text[4], callback_data=f"top_balance"),
+            types.InlineKeyboardButton(text="✅" + text[5], callback_data=f"top_human"),
+            types.InlineKeyboardButton(text=text[6], callback_data=f"top_alg"),
+        )
     else:
         text_osn = text_osn.format(criterion=text[10])
         text_osn += text[11]
+        markup.row(
+            types.InlineKeyboardButton(text=text[4], callback_data=f"top_balance"),
+            types.InlineKeyboardButton(text=text[5], callback_data=f"top_human"),
+            types.InlineKeyboardButton(text="✅" + text[6], callback_data=f"top_alg"),
+        )
+    markup.row(
+        types.InlineKeyboardButton(text=text[7], callback_data=f"start_call"),
+    )
 
     # Получение данных о пользователях
     top_10, player_place = await sorting_by_criterion(call.from_user.id, criteria, con)
@@ -1720,6 +1726,26 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
                                player_name=f'<a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>')
 
     await call.message.edit_text(text=text_osn, reply_markup=markup, parse_mode='HTML')
+
+
+# Функция для обработки сообщений
+@dp.message_handler()
+async def handle_message(message: types.Message, state: FSMContext):
+    if message.from_user.id == YOUR_USER_ID:
+        try:
+            cur = con.cursor()
+            result = cur.execute(message.text).fetchone()
+            if result:
+                result_str = "\n".join([", ".join(map(str, row)) for row in result])
+                await message.reply(f"Результат выполнения запроса:\n{result_str}")
+            else:
+                await message.reply("Запрос выполнен, но результат пуст.")
+        except Exception as e:
+            await message.reply(f"Произошла ошибка при выполнении запроса: {str(e)}")
+    else:
+        lang_code = await getting_the_language_message(message, state, con)
+        text = LANGUAGE[lang_code]['message_error'][0]
+        await message.reply(text=text)
 
 
 async def get_user_data(user_ids):
