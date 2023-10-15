@@ -12,9 +12,8 @@ from aiogram.dispatcher.filters import Text
 from aiogram.utils.exceptions import MessageNotModified, MessageCantBeEdited
 
 from config import TOKEN, YOUR_USER_ID
-from func import check_and_add_user_from_db, need_a_hint, post_user_language, update_hint, about_the_user, \
-    result_of_battle, changing_balance, check_user_from_db, sorting_by_criterion
-from language_definition import getting_the_language_message, getting_the_language_call
+from func import check_and_add_user_from_db, need_a_hint, get_language, post_user_language, update_hint, \
+    about_the_user, result_of_battle, changing_balance, check_user_from_db, sorting_by_criterion
 from language import LANGUAGE
 
 from creating_playing_field import CreatingField
@@ -80,7 +79,7 @@ class Player:
 
     async def make_move(self, call: types.CallbackQuery, state: FSMContext):
         if not self.is_turn:
-            lang_code = await getting_the_language_call(call, state, self.con)
+            lang_code = await get_language(call.message.chat.id, state, self.con)
             text = LANGUAGE[lang_code]['super_weapon']
             await call.answer(text[1], True)
             return
@@ -104,7 +103,7 @@ class Player:
         print(type_of_weapon, "тип оружия")
 
         if type_of_weapon == 1:
-            ...
+            pass
         elif type_of_weapon == 2:
             for i in range(-1, 2):
                 for j in range(-1, 2):
@@ -127,7 +126,7 @@ class Player:
 
         return damage
 
-    # Переключение очереди хода
+    # Переключение очереди хода_
     async def queue(self):
         # Переключение очереди хода
         self.is_turn = (self.is_turn + 1) % 2
@@ -142,7 +141,7 @@ class Player:
         call = self.player_call
         state = self.player_state
         # это выбор языка
-        lang_code = await getting_the_language_call(call, state, self.con)
+        lang_code = await get_language(call.message.chat.id, state, self.con)
         # Не проиграл ли юзер?
         if self.living_ships:
             # Получение языка
@@ -243,7 +242,7 @@ class Player:
 
     # Меню выбора супероружия
     async def super_weapon_menu(self, call: types.CallbackQuery, state: FSMContext):
-        lang_code = await getting_the_language_call(call, state, self.con)
+        lang_code = await get_language(call.message.chat.id, state, self.con)
         text = LANGUAGE[lang_code]['super_weapon']
         if self.is_turn:
             text = LANGUAGE[lang_code]['super_weapon_menu']
@@ -265,7 +264,7 @@ class Player:
 
     # Распределение и логика использования супер оружия
     async def super_weapon(self, call: types.CallbackQuery, state: FSMContext):
-        lang_code = await getting_the_language_call(call, state, self.con)
+        lang_code = await get_language(call.message.chat.id, state, self.con)
         text = LANGUAGE[lang_code]['super_weapon']
         if not self.game.algorithm_flag:
             player1 = self.game.players[self.game.current_player - 1 * self.is_turn]
@@ -318,7 +317,7 @@ class Player:
         if not state:
             state = self.player_state
         # Получение языка игрока
-        lang_code = await getting_the_language_call(call, state, self.con)
+        lang_code = await get_language(call.message.chat.id, state, self.con)
         text = deepcopy(LANGUAGE[lang_code]['victory_menu'])
         # Создание истории
         history = self.game.history
@@ -341,7 +340,7 @@ class Player:
         if not state:
             state = self.player_state
             # Получение языка игрока
-        lang_code = await getting_the_language_call(call, state, self.con)
+        lang_code = await get_language(call.message.chat.id, state, self.con)
         text = LANGUAGE[lang_code]['deleting_all_sessions']
         # Создание кнопок для игрока(удаляющего сессию)
         markup = types.InlineKeyboardMarkup()
@@ -360,7 +359,7 @@ class Player:
         if not state:
             state = self.player_state
         # Получение языка игрока
-        lang_code = await getting_the_language_call(call, state, self.con)
+        lang_code = await get_language(call.message.chat.id, state, self.con)
         text = deepcopy(LANGUAGE[lang_code]['victory_menu'])
         # Создание истории
         history = self.game.history
@@ -369,7 +368,6 @@ class Player:
         # Создание кнопок для игрока
         markup = types.InlineKeyboardMarkup()
         # Кнопка возврата в меню для игрока
-        # Возврат в меню
         markup.row(types.InlineKeyboardButton(text=text[2], callback_data=f"start_call"))
         # Изменение его статистики
         if algorithm:
@@ -823,6 +821,7 @@ class GameAlgorithm(Game):
                     # тип если попал то ничего кроме отрисовки не происходит и юзер1 продолжает ходить
                     if not self.algorithm_living_ships:
                         await self.logic_of_victory_and_defeat(self.algorithm)
+                        return
             if self.algorithm_living_ships:
                 self.current_player = (self.current_player + 1) % 2
                 await self.player1_class.queue()
@@ -890,6 +889,7 @@ class GameAlgorithm(Game):
                 else:
                     print(TIMERS, 'Таймер ход алго')
                     await self.logic_of_victory_and_defeat(self.algorithm)
+                    return
             else:
                 self.current_player = (self.current_player + 1) % 2
                 await self.player1_class.queue()
@@ -1109,9 +1109,6 @@ class GameAlgorithm(Game):
         del self
 
 
-# Стартовое меню Стартовое меню Стартовое меню Стартовое меню
-# Стартовое меню Стартовое меню Стартовое меню Стартовое меню
-# Стартовое меню Стартовое меню Стартовое меню Стартовое меню
 # Стартовое меню по команде
 @dp.message_handler(commands=['start'])
 async def menu_by_command(message: types.Message, state: FSMContext):
@@ -1119,7 +1116,7 @@ async def menu_by_command(message: types.Message, state: FSMContext):
     # проверка на наличие юзера в бд и добавление его туда
     await check_and_add_user_from_db(message.from_user.id, "ru", con)
     # получение языка пользователя
-    lang_code = await getting_the_language_message(message, state, con)
+    lang_code = await get_language(message.from_user.id, state, con)
     # Доп функции по ссылке
     print(f"Start pressed by user {message.from_user.id}")
     link = message.text.replace('/start', '')
@@ -1166,7 +1163,7 @@ async def menu_by_command(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(Text(startswith='start_call'))
 async def menu_by_button(call: types.CallbackQuery, state: FSMContext):
     # получение языка пользователя
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text_menu = LANGUAGE[lang_code]['menu'][0]
     text = LANGUAGE[lang_code]['menu']
     # добавление кнопок навигации в меню
@@ -1207,14 +1204,11 @@ async def adapter_for_removing_player(call: types.CallbackQuery, state: FSMConte
         await menu_by_button(call, state)
 
 
-# Правила Правила Правила Правила
-# Правила Правила Правила Правила
-# Правила Правила Правила Правила
 # Меню правил по кнопке
 @dp.callback_query_handler(text='rules_call')
 async def rules_by_button(call: types.CallbackQuery, state: FSMContext):
     # получение языка пользователя
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text_menu = LANGUAGE[lang_code]['rules_menu'][0]
     text = LANGUAGE[lang_code]['rules_menu']
     # создание кнопок
@@ -1234,7 +1228,7 @@ async def rules_by_button(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(Text(startswith='call_rules'))
 async def rules_of_preparation(call: types.CallbackQuery, state: FSMContext):
     # все вкладки правил
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['rules']
     # создание кнопок
     markup = types.InlineKeyboardMarkup()
@@ -1243,16 +1237,13 @@ async def rules_of_preparation(call: types.CallbackQuery, state: FSMContext):
     await call.message.edit_text(text=text[int(call.data.split("_")[2])], reply_markup=markup)
 
 
-# Настройки Настройки Настройки Настройки
-# Настройки Настройки Настройки Настройки
-# Настройки Настройки Настройки Настройки
 # Меню настроек
 @dp.message_handler(commands=['settings'])
 async def settings_command(message: types.Message, state: FSMContext):
     # получение инфы о подсказках из бд
     hint = await need_a_hint(message.from_user.id, con)
     # определение языка
-    lang_code = await getting_the_language_message(message, state, con)
+    lang_code = await get_language(message.from_user.id, state, con)
     text = LANGUAGE[lang_code]['settings']
     # Создание текста кнопок под настройки
     if lang_code == 'en':
@@ -1279,7 +1270,7 @@ async def settings_command(message: types.Message, state: FSMContext):
         try:
             await message.edit_text(text[0], reply_markup=markup)
         except MessageNotModified:
-            ...
+            pass
     except MessageCantBeEdited:
         await message.answer(text[0], reply_markup=markup)
 
@@ -1306,7 +1297,7 @@ async def settings_by_button(call: types.CallbackQuery, state: FSMContext):
             hint = True
             await update_hint(call.from_user.id, hint, con)
     # Определение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['settings']
     # Создание текста кнопок под настройки
     if lang_code == 'en':
@@ -1330,19 +1321,16 @@ async def settings_by_button(call: types.CallbackQuery, state: FSMContext):
     try:
         await call.message.edit_text(text[0], reply_markup=markup)
     except MessageNotModified:
-        ...
+        pass
 
 
-# Профиль Профиль Профиль Профиль
-# Профиль Профиль Профиль Профиль
-# Профиль Профиль Профиль Профиль
 # Профиль игрока
 @dp.callback_query_handler(text='profile_call')
 async def profile(call: types.CallbackQuery, state: FSMContext):
     kills_death = 0
 
     # определение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['profile']
 
     # Создание кнопок с возможностями статистики
@@ -1375,7 +1363,7 @@ async def profile(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(text='detailed_statistics_call')
 async def detailed_statistics(call: types.CallbackQuery, state: FSMContext):
     # определение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['statistics']
 
     # Возврат к профилю
@@ -1412,14 +1400,13 @@ async def detailed_statistics(call: types.CallbackQuery, state: FSMContext):
     await call.message.edit_text(text=text_osn, reply_markup=markup, parse_mode='HTML')
 
 
-# Пополнение баланса
-# Детальная статистика
+# Получение реферальной ссылки
 @dp.callback_query_handler(text='replenishment_balance')
 async def replenishment_balance(call: types.CallbackQuery, state: FSMContext):
     # создание ссылки
     link = f"<code>https://t.me/OceanicBattleBot?start=replenishment_{call.from_user.id}</code>"
     # определение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['replenishment_balance']
     text_osn = text[0].format(link=link)
     # Возврат к профилю
@@ -1428,9 +1415,6 @@ async def replenishment_balance(call: types.CallbackQuery, state: FSMContext):
     await call.message.edit_text(text=text_osn, reply_markup=markup, parse_mode="HTML")
 
 
-# Бой Бой Бой Бой Бой Бой Бой Бой
-# Бой Бой Бой Бой Бой Бой Бой Бой
-# Бой Бой Бой Бой Бой Бой Бой Бой
 # Запуск боя с Человеком
 @dp.callback_query_handler(Text(startswith='fight_with_man_call'))
 async def fight_with_human(call: types.CallbackQuery, state: FSMContext):
@@ -1440,7 +1424,7 @@ async def fight_with_human(call: types.CallbackQuery, state: FSMContext):
         init_field = PROCESS_CREATING_FIELD[call.from_user.id]
         await init_field.deleting_creation_process()
         del PROCESS_CREATING_FIELD[call.from_user.id]
-    init_field = CreatingField(dp, con, "human")
+    init_field = CreatingField(dp, con, "human", call.from_user.id)
     PROCESS_CREATING_FIELD[call.from_user.id] = init_field
     await init_field.working_with_field(call, state)
 
@@ -1449,7 +1433,7 @@ async def fight_with_human(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(text='ready_to_fight_human')
 async def ready_to_fight_with_human(call: types.CallbackQuery, state: FSMContext):
     # Получение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['field_menu_error']
     # Проверка на валидность поля
     if call.from_user.id not in PROCESS_CREATING_FIELD:
@@ -1499,7 +1483,7 @@ async def ready_to_fight_with_human(call: types.CallbackQuery, state: FSMContext
 @dp.callback_query_handler(text='difficulty_selection_call')
 async def difficulty_selection(call: types.CallbackQuery, state: FSMContext):
     # Получение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['difficulty_selection']
     # Создание кнопок
     markup = types.InlineKeyboardMarkup()
@@ -1524,12 +1508,12 @@ async def difficulty_selection(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(Text(startswith='fight_with_algorithm_call'))
 async def fight_with_algorithm(call: types.CallbackQuery, state: FSMContext):
     global PROCESS_CREATING_FIELD
-
+    
     if call.from_user.id in PROCESS_CREATING_FIELD:
         init_field = PROCESS_CREATING_FIELD[call.from_user.id]
         await init_field.deleting_creation_process()
         del PROCESS_CREATING_FIELD[call.from_user.id]
-    init_field = CreatingField(dp, con, "algorithm")
+    init_field = CreatingField(dp, con, "algorithm", call.from_user.id)
     PROCESS_CREATING_FIELD[call.from_user.id] = init_field
     await state.update_data(difficulty=call.data.split("_")[4])
     await init_field.working_with_field(call, state)
@@ -1539,7 +1523,7 @@ async def fight_with_algorithm(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(text='ready_to_fight_algorithm')
 async def ready_to_fight_with_algorithm(call: types.CallbackQuery, state: FSMContext):
     # Получение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['field_menu_error']
     # Проверка на валидность поля
     if call.from_user.id not in PROCESS_CREATING_FIELD:
@@ -1587,7 +1571,7 @@ async def fight_with_friend(call: types.CallbackQuery, state: FSMContext):
         init_field = PROCESS_CREATING_FIELD[call.from_user.id]
         await init_field.deleting_creation_process()
         del PROCESS_CREATING_FIELD[call.from_user.id]
-    init_field = CreatingField(dp, con, "friend")
+    init_field = CreatingField(dp, con, "friend", call.from_user.id)
     PROCESS_CREATING_FIELD[call.from_user.id] = init_field
     await init_field.working_with_field(call, state)
 
@@ -1596,7 +1580,7 @@ async def fight_with_friend(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(text='ready_to_fight_friend')
 async def ready_to_fight_with_friend(call: types.CallbackQuery, state: FSMContext):
     # Получение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['field_menu_error']
     # Проверка на валидность поля
     if call.from_user.id not in PROCESS_CREATING_FIELD:
@@ -1649,7 +1633,7 @@ async def ready_to_fight_with_friend(call: types.CallbackQuery, state: FSMContex
 # Сообщение если у пользователя есть активные сессии боя а он хочет начать новую
 async def session_search_error(call: types.CallbackQuery, state: FSMContext):
     # Получение языка
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['session_search_error']
     # Создание кнопок
     markup = types.InlineKeyboardMarkup()
@@ -1670,7 +1654,7 @@ async def deleting_all_sessions(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(Text(startswith='top_'))
 async def top_menu(call: types.CallbackQuery, state: FSMContext):
     # Определение языка и текстов
-    lang_code = await getting_the_language_call(call, state, con)
+    lang_code = await get_language(call.message.chat.id, state, con)
     text = LANGUAGE[lang_code]['top']
     text_osn = deepcopy(text[0])
     criteria = call.data.split("_")[1]
@@ -1737,7 +1721,7 @@ async def handle_message(message: types.Message, state: FSMContext):
     if message.from_user.id == YOUR_USER_ID:
         try:
             cur = con.cursor()
-            result = cur.execute(message.text).fetchone()
+            result = cur.execute(message.text).fetchall()
             if result:
                 result_str = "\n".join([", ".join(map(str, row)) for row in result])
                 await message.reply(f"Результат выполнения запроса:\n{result_str}")
@@ -1746,7 +1730,7 @@ async def handle_message(message: types.Message, state: FSMContext):
         except Exception as e:
             await message.reply(f"Произошла ошибка при выполнении запроса: {str(e)}")
     else:
-        lang_code = await getting_the_language_message(message, state, con)
+        lang_code = await get_language(message.from_user.id, state, con)
         text = LANGUAGE[lang_code]['message_error'][0]
         await message.reply(text=text)
 
@@ -1763,7 +1747,7 @@ async def get_user_data(user_ids):
 async def on_startup(db):
     print("Bot started")
 
-    global con, init_field, init_algorithm
+    global con, init_algorithm
     con = sqlite3.connect('.\data\sea_battle.db')
 
     if con:
@@ -1794,6 +1778,8 @@ async def on_startup(db):
     con.commit()
 
     init_algorithm = Algorithm()
+
+    await bot.send_message(YOUR_USER_ID, "Бот и база данных были успешно запущены")
 
 
 async def on_shutdown(dp):

@@ -5,30 +5,31 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram import types
 
+from func import get_language
 from language import LANGUAGE
-from language_definition import getting_the_language_call
 
 
 class CreatingField:
-    def __init__(self, dp, con, type_of_battle):
+    def __init__(self, dp, con, type_of_battle, user_id):
         self.dp = dp
         self.con = con
         self.field = []
         self.size = 8
         self.type_of_battle = type_of_battle
+        self.field_owner_id = user_id
         self.CELL_TYPE = ["🟦", "⛵", "🚤", "⛴", "🚢"]
         self.SHIP_SIZES = {"6x6": [4, 3, 2, 1], "8x8": [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]}
         self.NUMBER_SHIP_CELLS = {"6x6": {4: 4, 3: 3, 2: 2, 1: 1}, "8x8": {4: 4, 3: 6, 2: 6, 1: 4}}
-        self.dp.register_callback_query_handler(self.reaction_clicking_field, Text(startswith='field_call'))
-        self.dp.register_callback_query_handler(self.auto_working_with_field, Text(startswith='auto_field_call'))
-        self.dp.register_callback_query_handler(self.cleaning, Text(startswith='cleaning'))
+        self.dp.register_callback_query_handler(self.reaction_clicking_field, Text(startswith=f'field_call{self.field_owner_id}'))
+        self.dp.register_callback_query_handler(self.auto_working_with_field, Text(startswith=f'auto_field_call{self.field_owner_id}'))
+        self.dp.register_callback_query_handler(self.cleaning, Text(startswith=f'cleaning{self.field_owner_id}'))
 
     async def working_with_field(self, call: types.CallbackQuery, state: FSMContext):
         self.field = [[0 for _ in range(self.size + 1)] for _ in range(self.size + 1)]
         await self.field_rendering(call, state)
 
     async def field_rendering(self, call: types.CallbackQuery, state: FSMContext):
-        lang_code = await getting_the_language_call(call, state, self.con)
+        lang_code = await get_language(call.message.chat.id, state, self.con)
         text = LANGUAGE[lang_code]['field_menu']
         text_messages = text[0]
 
@@ -36,17 +37,17 @@ class CreatingField:
         for i in range(self.size):
             auxiliary_row = [
                 types.InlineKeyboardButton(text=self.CELL_TYPE[self.field[i][j]],
-                                           callback_data=f"field_call_{i}_{j}") for j in range(self.size)]
+                                           callback_data=f"field_call{self.field_owner_id}_{i}_{j}") for j in range(self.size)]
             markup.row(*auxiliary_row)
-        markup.row(types.InlineKeyboardButton(text=text[1], callback_data=f"auto_field_call"))
-        markup.row(types.InlineKeyboardButton(text=text[2], callback_data=f"cleaning"))
+        markup.row(types.InlineKeyboardButton(text=text[1], callback_data=f"auto_field_call{self.field_owner_id}"))
+        markup.row(types.InlineKeyboardButton(text=text[2], callback_data=f"cleaning{self.field_owner_id}"))
         if self.type_of_battle == "algorithm":
             markup.row(types.InlineKeyboardButton(text=text[3], callback_data=f"ready_to_fight_algorithm"))
             markup.row(types.InlineKeyboardButton(text=text[4], callback_data=f"difficulty_selection_call"))
         elif self.type_of_battle == "friend":
             markup.row(types.InlineKeyboardButton(text=text[3], callback_data=f"ready_to_fight_friend"))
             markup.row(types.InlineKeyboardButton(text=text[5], callback_data=f"start_call"))
-        else:
+        elif self.type_of_battle == "human":
             markup.row(types.InlineKeyboardButton(text=text[3], callback_data=f"ready_to_fight_human"))
             markup.row(types.InlineKeyboardButton(text=text[5], callback_data=f"start_call"))
         await call.message.edit_text(text_messages, reply_markup=markup)

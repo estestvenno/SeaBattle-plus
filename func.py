@@ -1,5 +1,19 @@
-import aiohttp
-import asyncio
+from aiogram.dispatcher import FSMContext
+
+
+# Получение языка
+async def get_language(uid: int, state: FSMContext, con):
+    data = await state.get_data()
+    lang_code = data.get('lang')
+    if lang_code is None:
+        # Если значение языка не сохранено в словаре, получаем его из базы данных
+        print(uid)
+        lang_code = await get_user_language(uid, con)
+        if not lang_code:
+            lang_code = 'en'
+            await post_user_language(uid, lang_code, con)
+        await state.update_data(lang=lang_code)
+    return lang_code
 
 
 # Проверка есть ли юзер в бд и добавление его туда
@@ -29,21 +43,22 @@ async def need_a_hint(user_id, con):
     return hint[0]
 
 
-# обновление языка пользователя для бд
+# Обновление языка пользователя для бд
 async def post_user_language(user_id, language, con):
     cur = con.cursor()
     cur.execute("""UPDATE user SET language=? WHERE user_id=?""", (language, user_id,))
     con.commit()
 
 
-# получение языка пользователя
+# Получение языка пользователя
 async def get_user_language(user_id, con):
     cur = con.cursor()
-    language = cur.execute("""SELECT language FROM user WHERE user_id = ?""", (user_id,)).fetchone()
+    print(user_id)
+    language = cur.execute("""SELECT language FROM user WHERE user_id = ?""", (str(user_id),)).fetchone()
     return language[0]
 
 
-# обновление подсказок во время игры
+# Обновление подсказок во время игры
 async def update_hint(user_id, hint, con):
     cur = con.cursor()
     cur.execute("""UPDATE user SET hint=? WHERE user_id=?""", (hint, user_id,))
@@ -80,17 +95,15 @@ async def result_of_battle(user_id, victory, con, algorithm=False, balance=20):
     con.commit()
 
 
-# списание баланса
+# Списание баланса
 async def changing_balance(user_id, balance, con):
     cur = con.cursor()
     cur.execute(f"""UPDATE user SET balance = balance + ? WHERE user_id=?""", (balance, user_id,)).fetchone()
     con.commit()
 
 
-
 # Асинхронная функция для вычисления Score игрока
-# Асинхронная функция для вычисления Score игрока
-async def calculate_score(player_data):
+def calculate_score(player_data):
     user_id, wins, total_games = player_data
     if total_games == 0:
         return user_id, wins, 0, 0  # Игрок без игр, Score и поражения None
@@ -99,7 +112,7 @@ async def calculate_score(player_data):
     return user_id, wins, losses, r
 
 
-# сортировка для топов
+# Сортировка для топов
 async def sorting_by_criterion(id_user, criterion, con):
     cursor = con.cursor()
 
@@ -117,7 +130,6 @@ async def sorting_by_criterion(id_user, criterion, con):
         return top_users, user_position
     else:
         if criterion == "human":
-
             cursor.execute('SELECT user_id, wins_over_the_people, games_against_people FROM detailed_statistics')
         else:
             cursor.execute('SELECT user_id, wins_over_the_algorithm, games_against_algorithm FROM detailed_statistics')
@@ -127,9 +139,7 @@ async def sorting_by_criterion(id_user, criterion, con):
         players_with_score = [(user_id, wins, None) for user_id, wins, _ in players_data]
 
         # Вычисляем Score для игроков асинхронно
-        async with aiohttp.ClientSession() as session:
-            tasks = [calculate_score(player_data) for player_data in players_data]
-            players_with_score = await asyncio.gather(*tasks)
+        players_with_score = [calculate_score(player_data) for player_data in players_data]
 
         # Сортируем игроков по Score в убывающем порядке
         sorted_players = sorted(players_with_score, key=lambda x: x[3], reverse=True)
