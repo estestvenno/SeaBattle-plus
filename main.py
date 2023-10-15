@@ -11,7 +11,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.utils.exceptions import MessageNotModified, MessageCantBeEdited
 
-from config import TOKEN, YOUR_USER_ID
+from config import TOKEN, YOUR_USER_ID, BAN_ID
 from func import check_and_add_user_from_db, need_a_hint, get_language, post_user_language, update_hint, \
     about_the_user, result_of_battle, changing_balance, check_user_from_db, sorting_by_criterion
 from language import LANGUAGE
@@ -1698,6 +1698,8 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
     for rank_u, (name_u, wins_u, losses_u, score_u) in enumerate(top_10, start=1):
         user_info = user_data.get(name_u, {})
         user_first_name = user_info.get('first_name', "")
+        if name_u in BAN_ID:
+            continue
 
         if criteria == "balance":
             text_u = text[1].format(rank=rank_u, name=f'<a href="tg://user?id={name_u}">{user_first_name}</a>',
@@ -1720,6 +1722,10 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
 async def handle_message(message: types.Message, state: FSMContext):
     if message.from_user.id == YOUR_USER_ID:
         try:
+            if 'BAN_ID' in message.text:
+                global BAN_ID
+                BAN_ID.append(int(message.text.split()[1]))
+                await message.reply("Запрос BAN_ID выполнен")
             cur = con.cursor()
             result = cur.execute(message.text).fetchall()
             if result:
