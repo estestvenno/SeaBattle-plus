@@ -1,3 +1,5 @@
+import sqlite3
+
 from aiogram.dispatcher import FSMContext
 
 
@@ -23,8 +25,11 @@ async def check_and_add_user_from_db(user_id, language, con):
     if user:
         return
     cur.execute("""INSERT INTO user (user_id, language, hint) VALUES (?, ?, ?)""", (user_id, language, False,))
-    cur.execute("""INSERT INTO detailed_statistics (user_id) VALUES (?)""", (user_id,))
-    con.commit()
+    try:
+        cur.execute("""INSERT INTO detailed_statistics (user_id) VALUES (?)""", (user_id,))
+        con.commit()
+    except sqlite3.IntegrityError:
+        con.commit()
 
 
 # Проверка есть ли юзер в бд
@@ -119,11 +124,11 @@ async def sorting_by_criterion(id_user, criterion, con):
 
     # Получаем данные о победах и общем количестве игр игроков из базы данных
     if criterion == "balance":
-        cursor.execute("SELECT user_id, balance, hint, language FROM user ORDER BY balance DESC LIMIT 10")
+        cursor.execute("SELECT user_id, balance, hint, language FROM user ORDER BY balance")
         top_users = cursor.fetchall()
 
         # Найдите позицию пользователя по ID в отсортированной таблице по балансу
-        your_user_id = 123  # Замените 123 на ID пользователя, которого вы хотите найти
+        your_user_id = id_user  # Замените 123 на ID пользователя, которого вы хотите найти
         cursor.execute("SELECT COUNT(*) + 1 FROM user WHERE balance > (SELECT balance FROM user WHERE user_id = ?)",
                        (your_user_id,))
         user_position = cursor.fetchone()[0]
@@ -148,7 +153,6 @@ async def sorting_by_criterion(id_user, criterion, con):
         player_place = next((i + 1 for i, (user_id, _, _, _) in enumerate(sorted_players) if user_id == id_user), None)
 
         # Возвращаем топ-10 игроков и место игрока
-        top_10_players = sorted_players[:10]
-        return top_10_players, player_place
+        return sorted_players, player_place
 
 

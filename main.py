@@ -1,10 +1,12 @@
 import asyncio
 import logging
 import random
+import html
 import sqlite3
 from copy import deepcopy
 from pprint import pprint
 
+import aiogram
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
@@ -1454,6 +1456,7 @@ async def ready_to_fight_with_human(call: types.CallbackQuery, state: FSMContext
             del PROCESS_CREATING_FIELD[call.from_user.id]
             await session_search_error(call, state)
         else:
+            global TIMERS
             # Получение всей информации о предстоящем бое
             # Карта игрока
             field = field
@@ -1465,6 +1468,9 @@ async def ready_to_fight_with_human(call: types.CallbackQuery, state: FSMContext
             PLAYERS_IN_GAME[call.from_user.id] = player
             # Если есть активные игры
             if GAME_SEARCH:
+                user_id = GAME_SEARCH[0].player1_class.player_call.from_user.id
+                TIMERS[user_id].cancel()
+                del TIMERS[user_id]
                 # Присоединяемся к активной игре
                 await player.connecting_to_game(GAME_SEARCH[0])
                 await GAME_SEARCH[0].joining_a_player_and_start_game(player)
@@ -1475,6 +1481,8 @@ async def ready_to_fight_with_human(call: types.CallbackQuery, state: FSMContext
                 await player.connecting_to_game(game)
                 GAME_SEARCH.append(game)
                 markup = types.InlineKeyboardMarkup()
+                TIMERS[call.from_user.id] = asyncio.get_event_loop().call_later(45, deleting_all_sessions_for_time,
+                                                                                call.from_user.id)
                 markup.row(types.InlineKeyboardButton(text=text[4], callback_data="deleting_all_sessions"))
                 await call.message.edit_text(text[3], reply_markup=markup)
 
@@ -1614,6 +1622,8 @@ async def ready_to_fight_with_friend(call: types.CallbackQuery, state: FSMContex
             data = await state.get_data()
             friend_code = data.get('friend')
             if friend_code in FRIEND_GAME_SEARCH:
+                TIMERS[friend_code].cancel()
+                del TIMERS[friend_code]
                 await player.connecting_to_game(FRIEND_GAME_SEARCH[friend_code])
                 await FRIEND_GAME_SEARCH[friend_code].joining_a_player_and_start_game(player)
                 FRIEND_GAME_SEARCH.pop(friend_code)
@@ -1625,6 +1635,8 @@ async def ready_to_fight_with_friend(call: types.CallbackQuery, state: FSMContex
                 FRIEND_GAME_SEARCH[call.from_user.id] = game
                 text_a = text[5].format(link="<code>https://t.me/OceanicBattleBot?start=battle_"
                                              f"{call.from_user.id}</code>")
+                TIMERS[call.from_user.id] = asyncio.get_event_loop().call_later(45, deleting_all_sessions_for_time,
+                                                                                call.from_user.id)
                 markup = types.InlineKeyboardMarkup()
                 markup.row(types.InlineKeyboardButton(text=text[4], callback_data="deleting_all_sessions"))
                 await call.message.edit_text(text_a, reply_markup=markup, parse_mode="HTML")
@@ -1647,8 +1659,20 @@ async def session_search_error(call: types.CallbackQuery, state: FSMContext):
 # Процесс удаления всех сессий боя
 @dp.callback_query_handler(text='deleting_all_sessions')
 async def deleting_all_sessions(call: types.CallbackQuery, state: FSMContext):
+    global TIMERS
+    TIMERS[call.from_user.id].cancel()
+    del TIMERS[call.from_user.id]
     # Получение его объекта класса
     await PLAYERS_IN_GAME[call.from_user.id].game.logic_of_victory_and_defeat(PLAYERS_IN_GAME[call.from_user.id])
+
+
+# Процесс удаления всех сессий боя
+def deleting_all_sessions_for_time(user_id):
+    global TIMERS
+    TIMERS[user_id].cancel()
+    del TIMERS[user_id]
+    asyncio.get_event_loop().create_task(
+        PLAYERS_IN_GAME[user_id].game.logic_of_victory_and_defeat(PLAYERS_IN_GAME[user_id]))
 
 
 @dp.callback_query_handler(Text(startswith='top_'))
@@ -1690,31 +1714,45 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
     )
 
     # Получение данных о пользователях
-    top_10, player_place = await sorting_by_criterion(call.from_user.id, criteria, con)
-    user_ids = [name_u for rank_u, (name_u, _, _, _) in enumerate(top_10, start=1)]
-    user_data = await get_user_data(user_ids)
-
-    # Формирование текста статистики
-    for rank_u, (name_u, wins_u, losses_u, score_u) in enumerate(top_10, start=1):
-        user_info = user_data.get(name_u, {})
-        user_first_name = user_info.get('first_name', "")
-        if name_u in BAN_ID:
+    top, player_place = await sorting_by_criterion(call.from_user.id, criteria, con)
+    i = 0
+    place = 1
+    user_data = []
+    while True:
+        i += 1
+        if place == len(top) or place > 10 or i > (len(top) - 1):
+            break
+        user_id = top[i]
+        if user_id[0] in BAN_ID:
             continue
+        user = await get_user_data(user_id[0])
+        if user:
+            user_data.append([place, top[i][0], user["first_name"], user["last_name"], top[i][1], top[i][2], top[i][3]])
+            place += 1
+
+    #Формирование текста статистики
+    for i in user_data:
+        place = i[0]
+        user_id = i[1]
+        first_name = html.escape(i[2])
+        victory = i[4]
+        defeats = i[5]
+        rating = i[6]
 
         if criteria == "balance":
-            text_u = text[1].format(rank=rank_u, name=f'<a href="tg://user?id={name_u}">{user_first_name}</a>',
-                                    wins=wins_u)
+            text_u = text[1].format(rank=place, name=f"<a href='tg://user?id={user_id}'>{first_name}</a>",
+                                    wins=victory)
         else:
-            score_u = "{:.2f}".format(score_u)
-            text_u = text[2].format(rank=rank_u, name=f'<a href="tg://user?id={name_u}">{user_first_name}</a>',
-                                    wins=wins_u, losses=losses_u, score=score_u)
+            rating = "{:.2f}".format(rating)
+            text_u = text[2].format(rank=place, name=f"<a href='tg://user?id={user_id}'>{first_name}</a>",
+                                    wins=victory, losses=defeats, score=rating)
         text_osn += text_u
 
     # Добавление информации о текущем пользователе
     text_osn += text[3].format(player_place=player_place,
-                               player_name=f'<a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>')
-
-    await call.message.edit_text(text=text_osn, reply_markup=markup, parse_mode='HTML')
+                               player_name=f"<a href='tg://user?id={call.from_user.id}'>{html.escape(call.from_user.first_name)}</a>")
+    print(text_osn)
+    await call.message.edit_text(text=str(text_osn), reply_markup=markup, parse_mode='HTML')
 
 
 # Функция для обработки сообщений
@@ -1741,13 +1779,16 @@ async def handle_message(message: types.Message, state: FSMContext):
         await message.reply(text=text)
 
 
-async def get_user_data(user_ids):
-    user_data = {}
-    for user_id in user_ids:
-        user = await bot.get_chat(user_id)
+async def get_user_data(user_id):
+    try:
+        user = await bot.get_chat(int(user_id))
         if user:
-            user_data[user_id] = {'first_name': user.first_name, 'last_name': user.last_name}
-    return user_data
+            user_data = {'first_name': user.first_name, 'last_name': user.last_name}
+            return user_data
+        else:
+            return False
+    except aiogram.utils.exceptions.ChatNotFound:
+        return False
 
 
 async def on_startup(db):
