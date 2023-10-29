@@ -9,7 +9,6 @@ async def get_language(uid: int, state: FSMContext, con):
     lang_code = data.get('lang')
     if lang_code is None:
         # Если значение языка не сохранено в словаре, получаем его из базы данных
-        print(uid)
         lang_code = await get_user_language(uid, con)
         if not lang_code:
             lang_code = 'en'
@@ -58,7 +57,6 @@ async def post_user_language(user_id, language, con):
 # Получение языка пользователя
 async def get_user_language(user_id, con):
     cur = con.cursor()
-    print(user_id)
     language = cur.execute("""SELECT language FROM user WHERE user_id = ?""", (str(user_id),)).fetchone()
     return language[0]
 
@@ -124,7 +122,7 @@ async def sorting_by_criterion(id_user, criterion, con):
 
     # Получаем данные о победах и общем количестве игр игроков из базы данных
     if criterion == "balance":
-        cursor.execute("SELECT user_id, balance, hint, language FROM user ORDER BY balance")
+        cursor.execute("SELECT user_id, balance, hint, language FROM user ORDER BY balance DESC")
         top_users = cursor.fetchall()
 
         # Найдите позицию пользователя по ID в отсортированной таблице по балансу
@@ -132,6 +130,7 @@ async def sorting_by_criterion(id_user, criterion, con):
         cursor.execute("SELECT COUNT(*) + 1 FROM user WHERE balance > (SELECT balance FROM user WHERE user_id = ?)",
                        (your_user_id,))
         user_position = cursor.fetchone()[0]
+
         return top_users, user_position
     else:
         if criterion == "human":

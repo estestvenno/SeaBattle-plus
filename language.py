@@ -6,7 +6,7 @@ LANGUAGE = {
             "🏠 Меню"
             "\n⚓️ Готов начать бой? ⚓️"
             "\nПо всем вопросам и возникшим багам"
-            f"\n<a href='{LINK_TO_THE_CHAT}'>Чатики о боте</a>",
+            f"\n<a href='{LINK_TO_THE_CHAT}'>Чатик о боте</a>",
             "📚 Правила игры",
             "⚙️ Настройки",
             "👤 Профиль",
@@ -247,7 +247,7 @@ LANGUAGE = {
             "🏠 Menu"
             "\n⚓️ Ready to start a battle? ⚓️"
             "\nFor any questions and any bugs that arise "
-            "\n<a href='tg://user?id={898565893}'>Developer</a>",
+            f"\n<a href='{LINK_TO_THE_CHAT}'>Bot Chat</a>",
             "📚 Game Rules",
             "⚙️ Settings",
             "👤 Profile",

@@ -271,15 +271,15 @@ class Player:
         if not self.game.algorithm_flag:
             player1 = self.game.players[self.game.current_player - 1 * self.is_turn]
             player1_name = f'<a href="tg://user?id={player1.player_call.from_user.id}' \
-                           f'">{player1.player_call.from_user.first_name}</a>'
+                           f'">{html.escape(player1.player_call.from_user.first_name)}</a>'
             player2_name = f'<a href="tg://user?id={self.player_call.from_user.id}' \
-                           f'">{self.player_call.from_user.first_name}</a>'
+                           f'">{html.escape(self.player_call.from_user.first_name)}</a>'
             player1_field = self.game.player1_class.board
             player2_field = self.board
         else:
             player1_name = self.game.algorithm.name
             player2_name = f'<a href="tg://user?id={self.player_call.from_user.id}' \
-                           f'">{self.player_call.from_user.first_name}</a>'
+                           f'">{html.escape(self.player_call.from_user.first_name)}</a>'
             player1_field = self.game.field_algorithm
             player2_field = self.board
         player1 = [player1_name, player1_field]
@@ -597,8 +597,8 @@ class Game:
 
     # Отправляем команду о том что нужно нарисовать поле
     async def drawing_field_for_players(self):
-        player1_name = f'<a href="tg://user?id={self.player1_class.player_call.from_user.id}">{self.player1_class.player_call.from_user.first_name}</a>'
-        player2_name = f'<a href="tg://user?id={self.player2_class.player_call.from_user.id}">{self.player2_class.player_call.from_user.first_name}</a>'
+        player1_name = f'<a href="tg://user?id={self.player1_class.player_call.from_user.id}">{html.escape(self.player1_class.player_call.from_user.first_name)}</a>'
+        player2_name = f'<a href="tg://user?id={self.player2_class.player_call.from_user.id}">{html.escape(self.player2_class.player_call.from_user.first_name)}</a>'
         player1_field = self.player1_class.board
         player2_field = self.player2_class.board
         player1 = [player1_name, player1_field]
@@ -1073,7 +1073,7 @@ class GameAlgorithm(Game):
 
     async def drawing_field_for_players(self):
         player1_name = f'<a href="tg://user?id={self.player1_class.player_call.from_user.id}' \
-                       f'">{self.player1_class.player_call.from_user.first_name}</a>'
+                       f'">{html.escape(self.player1_class.player_call.from_user.first_name)}</a>'
         player2_name = self.algorithm.name
         player1_field = self.player1_class.board
         player2_field = self.field_algorithm
@@ -1516,7 +1516,7 @@ async def difficulty_selection(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(Text(startswith='fight_with_algorithm_call'))
 async def fight_with_algorithm(call: types.CallbackQuery, state: FSMContext):
     global PROCESS_CREATING_FIELD
-    
+
     if call.from_user.id in PROCESS_CREATING_FIELD:
         init_field = PROCESS_CREATING_FIELD[call.from_user.id]
         await init_field.deleting_creation_process()
@@ -1715,12 +1715,12 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
 
     # Получение данных о пользователях
     top, player_place = await sorting_by_criterion(call.from_user.id, criteria, con)
-    i = 0
+    i = -1
     place = 1
     user_data = []
     while True:
         i += 1
-        if place == len(top) or place > 10 or i > (len(top) - 1):
+        if place > 10 or i == len(top):
             break
         user_id = top[i]
         if user_id[0] in BAN_ID:
@@ -1730,7 +1730,7 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
             user_data.append([place, top[i][0], user["first_name"], user["last_name"], top[i][1], top[i][2], top[i][3]])
             place += 1
 
-    #Формирование текста статистики
+    # Формирование текста статистики
     for i in user_data:
         place = i[0]
         user_id = i[1]
@@ -1751,7 +1751,6 @@ async def top_menu(call: types.CallbackQuery, state: FSMContext):
     # Добавление информации о текущем пользователе
     text_osn += text[3].format(player_place=player_place,
                                player_name=f"<a href='tg://user?id={call.from_user.id}'>{html.escape(call.from_user.first_name)}</a>")
-    print(text_osn)
     await call.message.edit_text(text=str(text_osn), reply_markup=markup, parse_mode='HTML')
 
 
@@ -1761,7 +1760,6 @@ async def handle_message(message: types.Message, state: FSMContext):
     if message.from_user.id == YOUR_USER_ID:
         try:
             if 'BAN_ID' in message.text:
-                global BAN_ID
                 BAN_ID.append(int(message.text.split()[1]))
                 await message.reply("Запрос BAN_ID выполнен")
             cur = con.cursor()
